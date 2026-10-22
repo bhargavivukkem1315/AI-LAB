@@ -1,0 +1,178 @@
+"""
+Practical 10: Value Iteration MDP — Smart Irrigation System
+==============================================================
+Real-life Application: Smart Irrigation System for Gujarat Farmers
+Crops: Cotton, Groundnut, Wheat
+Sequential decision-making under uncertainty using Value Iteration.
+
+How to run:
+    python practicals/practical_10_value_iteration/non_ui.py
+"""
+
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from practicals.practical_10_value_iteration.logic import run_smart_irrigation_value_iteration
+
+
+def display_scenario_results(title, result):
+    print("\n" + "=" * 75)
+    print(f"  {title}")
+    print("=" * 75)
+    print(f"Crop Type          : {result['crop_type']} ({result['crop_stage']})")
+    print(f"Soil Moisture      : {result['soil_moisture']}% ({result['current_moisture_level']})")
+    print(f"Temperature        : {result['temperature']} deg C")
+    print(f"Rain Forecast      : {result['rain_forecast']}")
+    print(f"Water Availability : {result['water_availability']}")
+    print(f"Discount Factor g  : {result['gamma']}")
+    print(f"MDP Convergence    : {result['converged_iteration']} iterations (Time: {result['execution_time_ms']} ms)")
+
+    print("\n" + "-" * 75)
+    print("  AI IRRIGATION POLICY RECOMMENDATION (Value Iteration)")
+    print("-" * 75)
+    print(f"  Recommended Action : {result['recommended_action'].upper()}")
+    print(f"  Pump Status        : {result['pump_status']}")
+    print(f"  Irrigation Volume  : {result['irrigation_volume_liters']} Litres / m2")
+    print(f"  Expected State V*  : +{result['expected_state_value']}")
+    print(f"  Resource Savings   : {result['water_saved_pct']}% water ({result['water_saved_liters']}L saved) | {result['electricity_saved_kwh']} kWh electricity")
+
+    print("\n" + "-" * 75)
+    print("  DECISION EXPLANATION (Why did Value Iteration choose this?)")
+    print("-" * 75)
+    print(f"  {result['decision_explanation']}")
+
+    print("\n" + "-" * 75)
+    print("  ACTION VALUE BREAKDOWN Q(s, a) FOR CURRENT STATE:")
+    print("-" * 75)
+    for act in result['action_comparison']:
+        win = " [SELECTED OPTIMAL POLICY pi*]" if act['action'] == result['recommended_action'] else ""
+        print(f"  - {act['action']:<25} : Q = {act['q_val']:>6.2f} (Immediate R = {act['reward']:>5.2f}){win}")
+
+    print("\n" + "-" * 75)
+    print("  FARMING MDP OPTIMAL POLICY MATRIX pi*(s) [5 Moisture x 2 Rain States]:")
+    print("-" * 75)
+    print(f"  {'Moisture Level':<15} | {'No Rain Expected':<22} | {'Rain Expected Tomorrow':<22}")
+    print("  " + "-" * 67)
+    for m_idx, m_name in enumerate(result['moisture_labels']):
+        pol_no_rain = result['policy_grid'][m_idx][0]
+        pol_rain = result['policy_grid'][m_idx][1]
+        v_no_rain = result['value_grid'][m_idx][0]
+        v_rain = result['value_grid'][m_idx][1]
+        cur_mark = " *" if m_idx == result['current_state_coords'][0] else "  "
+        print(f"{cur_mark}{m_name:<13} | {pol_no_rain:<10} (V={v_no_rain:>5.2f}) | {pol_rain:<10} (V={v_rain:>5.2f})")
+    print("  (* indicates current soil moisture level)")
+
+
+def main():
+    print("=" * 75)
+    print("  AI PRACTICAL 10: SMART IRRIGATION SYSTEM (VALUE ITERATION MDP)")
+    print("  Sequential Decision-Making under Uncertainty for Gujarat Farmers")
+    print("=" * 75)
+
+    # Check if running interactively with a terminal attached
+    is_interactive = sys.stdin.isatty()
+
+    if is_interactive:
+        print("\nChoose an option:")
+        print("  1. Enter Custom Field Conditions (User Input)")
+        print("  2. Run Comparison Demonstration (All 3 Key Syllabus Scenarios)")
+        try:
+            choice = input("\nEnter choice (1 or 2, default 2): ").strip()
+        except EOFError:
+            choice = "2"
+    else:
+        choice = "2"
+
+    if choice == "1":
+        print("\n--- Enter Farm Field Conditions ---")
+        try:
+            print("Crops: 1. Cotton | 2. Groundnut | 3. Wheat")
+            c_in = input("Select Crop (1-3, default 1): ").strip()
+            crop_map = {"1": "Cotton", "2": "Groundnut", "3": "Wheat"}
+            crop = crop_map.get(c_in, "Cotton")
+
+            m_in = input("Soil Moisture % (5 to 95, default 25): ").strip()
+            moisture = float(m_in) if m_in else 25.0
+
+            t_in = input("Temperature deg C (15, 30, 35, 45, default 35): ").strip()
+            temp = float(t_in) if t_in else 35.0
+
+            print("Rain Forecast: 1. No rain expected | 2. Rain expected tomorrow")
+            r_in = input("Select Rain Forecast (1-2, default 1): ").strip()
+            rain = "Rain expected" if r_in == "2" else "No rain expected"
+
+            print("Water Availability: 1. Low (Scarcity) | 2. Medium (Normal) | 3. High (Abundant)")
+            w_in = input("Select Water Availability (1-3, default 2): ").strip()
+            w_map = {"1": "Low", "2": "Medium", "3": "High"}
+            water = w_map.get(w_in, "Medium")
+
+            print("Stage: 1. Seedling | 2. Vegetative | 3. Flowering | 4. Maturity")
+            s_in = input("Select Growth Stage (1-4, default 3): ").strip()
+            s_map = {"1": "Seedling", "2": "Vegetative", "3": "Flowering", "4": "Maturity"}
+            stage = s_map.get(s_in, "Flowering")
+        except (ValueError, EOFError):
+            crop, moisture, temp, rain, water, stage = "Cotton", 25.0, 35.0, "No rain expected", "Medium", "Flowering"
+
+        res = run_smart_irrigation_value_iteration(
+            crop_type=crop,
+            soil_moisture=moisture,
+            temperature=temp,
+            rain_forecast=rain,
+            water_availability=water,
+            crop_stage=stage
+        )
+        display_scenario_results("CUSTOM USER FIELD ANALYSIS", res)
+
+    else:
+        # Run the 3 Key Syllabus Comparison Scenarios requested by the user
+        print("\n[Executing Syllabus Demonstration Scenarios]...")
+
+        # Scenario 1: Dry Soil + Rain Expected Tomorrow
+        res1 = run_smart_irrigation_value_iteration(
+            crop_type="Cotton",
+            soil_moisture=25.0,
+            temperature=35.0,
+            rain_forecast="Rain expected",
+            water_availability="Medium",
+            crop_stage="Flowering"
+        )
+        display_scenario_results("SCENARIO 1: Dry Soil (25%) + Rain Expected Tomorrow", res1)
+
+        # Scenario 2: Dry Soil + Scorching Heat (45 deg C) & No Rain
+        res2 = run_smart_irrigation_value_iteration(
+            crop_type="Cotton",
+            soil_moisture=25.0,
+            temperature=45.0,
+            rain_forecast="No rain expected",
+            water_availability="Medium",
+            crop_stage="Flowering"
+        )
+        display_scenario_results("SCENARIO 2: Dry Soil (25%) + Scorching Heat (45 deg C) & No Rain", res2)
+
+        # Scenario 3: Water Scarcity (Low water availability)
+        res3 = run_smart_irrigation_value_iteration(
+            crop_type="Groundnut",
+            soil_moisture=25.0,
+            temperature=30.0,
+            rain_forecast="No rain expected",
+            water_availability="Low",
+            crop_stage="Vegetative"
+        )
+        display_scenario_results("SCENARIO 3: Water Scarcity (Low Water Availability)", res3)
+
+    print("\n" + "=" * 75)
+    print("SUMMARY COMPARISON & CONCLUSION:")
+    print("1. When Rain is Expected tomorrow, Value Iteration delays/minimizes pumping,")
+    print("   saving up to 66.7% water and avoiding waterlogging penalties.")
+    print("2. Under Scorching Heat (45 deg C) with No Rain, the high evapotranspiration")
+    print("   drives the policy to High Irrigation to safeguard the crop from drought stress.")
+    print("3. When Water Availability is Low, high scarcity cost shifts the policy to conserve water.")
+    print("=" * 75 + "\n")
+
+
+if __name__ == "__main__":
+    main()
