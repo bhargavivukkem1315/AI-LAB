@@ -1,0 +1,119 @@
+"""
+Practical 7: Develop a Health Risk Prediction System Using a Bayesian Network
+             and Perform Probabilistic Inference Using Python.
+
+Educational demonstration -- NOT a medical diagnosis tool.
+
+File Name: practical_07_bayesian.py
+How to run:
+    python practicals/practical_07_bayesian/non_ui.py
+"""
+
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from practicals.practical_07_bayesian.logic import (
+    analyze_health_risk,
+    analyze_machine_failure,
+    infer_probabilities,
+)
+
+
+def main():
+    print("=" * 70)
+    print("PRACTICAL 7: HEALTH RISK PREDICTION -- BAYESIAN NETWORK")
+    print("Educational probabilistic inference demo (not a clinical tool)")
+    print("=" * 70)
+
+    print("\nBayesian Network (simplified educational DAG):")
+    print("""
+                 Smoking
+                    |
+                    v
+Blood Pressure --> Health Risk <-- Cholesterol
+                    ^
+                    |
+             Family History
+                    ^
+                    |
+                Exercise
+""")
+
+    evidence = {
+        "age_group": "40-60",
+        "smoking": "Yes",
+        "exercise": "Low",
+        "blood_pressure": "High",
+        "cholesterol": "High",
+        "family_history": "Yes",
+        "chest_pain": "No",
+    }
+
+    print("INPUT (Evidence)")
+    print("-" * 40)
+    for k, v in evidence.items():
+        print(f"  {k:16s}: {v}")
+
+    result = analyze_health_risk(evidence)
+    r = result["result"]
+
+    print("\n        |")
+    print("        v")
+    print("  Bayesian Network")
+    print("        |")
+    print("        v")
+    print("  Probabilistic Inference")
+    print("        |")
+    print("        v")
+    print(f"\n  High Risk     : {r['high_risk']}%")
+    print(f"  Low Risk      : {r['low_risk']}%")
+    print(f"\n  Query : {result['query']}")
+    print(f"  P(High Risk | Evidence) = {r['p_high']}")
+    print(f"  P(Low Risk | Evidence)  = {r['p_low']}")
+    print(f"  Status: {result['status']} [OK]")
+
+    # What-if analysis
+    improved = {
+        **evidence,
+        "smoking": "No",
+        "exercise": "High",
+        "blood_pressure": "Normal",
+    }
+    what_if = analyze_health_risk(improved, previous_high=r["high_risk"])
+    wi = what_if["what_if"]
+    print("\n--- WHAT-IF ANALYSIS ---")
+    print("Changed: Smoking=No, Exercise=High, Blood Pressure=Normal")
+    print(f"  Previous Risk : {wi['previous_risk']}%")
+    print(f"  New Risk      : {wi['new_risk']}%")
+    print(f"  Risk Change   : {wi['risk_change']}%")
+
+    # Optional Industry 4.0 mode
+    print("\n--- OPTIONAL: MACHINE FAILURE (Industry 4.0) ---")
+    m = analyze_machine_failure({
+        "temperature": "High",
+        "vibration": "High",
+        "pressure": "Normal",
+        "load": "High",
+        "machine_age": "Old",
+    })
+    print(f"  High Failure Risk : {m['result']['high_risk']}%")
+    print(f"  Low Failure Risk  : {m['result']['low_risk']}%")
+    print(f"  Status: {m['machine_status']}")
+
+    # Legacy weather inference (syllabus enumeration example)
+    print("\n--- LEGACY: Weather network enumeration (Wet Grass=True) ---")
+    w = infer_probabilities({"wet_grass": True})
+    rain = w["posteriors"]["rain"]
+    print(f"  P(Rain=True | Wet Grass) = {rain['percentage_true']}%")
+
+    print("\n" + "=" * 70)
+    print(result["disclaimer"])
+    print("=" * 70)
+
+
+if __name__ == "__main__":
+    main()
