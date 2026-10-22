@@ -1,0 +1,208 @@
+"""
+Practical 12: AI Learning Model Comparison Using a Student Performance Dataset
+================================================================================
+Syllabus: Implement a simple AI learning model such as k-NN, Decision Tree,
+          Naive Bayes, or Perceptron and compare results on a toy dataset.
+
+Real-Life Scenario:
+  A college wants to study whether study time, absences, past failures,
+  parental education, and lifestyle indicators can help predict whether
+  a student is likely to pass or fail before final examinations.
+
+File Name: practical_12_learning.py
+How to run:
+    python practicals/practical_12_learning/non_ui.py
+"""
+
+import sys
+import time
+from pathlib import Path
+
+# Add project root to path
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from practicals.practical_12_learning.logic import (
+    get_dataset_info,
+    train_and_compare_models,
+    predict_single_record
+)
+
+
+def print_banner():
+    print("=" * 78)
+    print("  AI PRACTICAL 12: SUPERVISED LEARNING MODEL COMPARISON")
+    print("  Dataset: UCI Student Performance (395 records) | Target: Pass / Fail")
+    print("=" * 78)
+    print("Syllabus Definition:")
+    print("  Implement a simple AI learning model such as k-NN, Decision Tree,")
+    print("  Naive Bayes, or Perceptron and compare results on a toy dataset.\n")
+    print("Real-Life College Early-Warning Scenario:")
+    print("  Predicting academic outcome (Pass: G3 >= 10 | Fail: G3 < 10) using:")
+    print("  - Weekly study time (studytime: 1=<2h, 2=2-5h, 3=5-10h, 4=>10h)")
+    print("  - Past class failures (failures: 0 to 3)")
+    print("  - School absences (absences: 0 to 75)")
+    print("  - Mother's & Father's education (Medu, Fedu: 0 to 4)")
+    print("  - Free time, going out with friends, health status, and age.")
+    print("=" * 78)
+
+
+def run_benchmark():
+    # 1. Dataset Info
+    print("\n[OPERATION 1: DATASET INSPECTION & PREPARATION]")
+    info = get_dataset_info("student")
+    print(f"  Dataset Name       : UCI Student Performance")
+    print(f"  Total Student Rows : {info['total_rows']}")
+    print(f"  Total Attributes   : {info['total_columns']}")
+    print(f"  Target Column      : {info['default_target']}")
+    print(f"  Class Distribution : {info['class_distribution']}")
+
+    # 2. Train and Evaluate
+    print("\n[OPERATION 2 & 3: TRAIN-TEST SPLIT & MODEL TRAINING]")
+    print("  Train Split Ratio  : 80% Training (316 records) | 20% Test Holdout (79 records)")
+    print("  Random State Seed  : 42 (Reproducible)")
+    print("  Scaling Strategy   : StandardScaler applied to k-NN & Perceptron; Tree & NB unscaled.")
+
+    res = train_and_compare_models(
+        dataset_name="student",
+        test_size=0.20,
+        random_state=42,
+        algorithms=["k-NN", "Decision Tree", "Naive Bayes", "Perceptron"],
+        knn_k=5,
+        tree_depth=4,
+        perceptron_iter=1000
+    )
+
+    # 3. Model Benchmark Table
+    print("\n[OPERATION 4 & 5: ALGORITHM EVALUATION & BENCHMARK COMPARISON]")
+    print("-" * 88)
+    print(f"{'Algorithm Paradigm':<16} | {'Accuracy':<9} | {'Precision':<9} | {'Recall':<8} | {'F1-Score':<8} | {'Train(ms)':<9} | {'Pred(ms)'}")
+    print("-" * 88)
+
+    for m in res["model_benchmarks"]:
+        is_best = (m["model_name"] == res["best_model_name"])
+        star = " [*BEST]" if is_best else ""
+        print(
+            f"{m['model_name']:<16} | "
+            f"{m['accuracy']:>7.2f}% | "
+            f"{m['precision']:>7.2f}% | "
+            f"{m['recall']:>6.2f}% | "
+            f"{m['f1_score']:>6.2f}% | "
+            f"{m['train_time_ms']:>8.3f} | "
+            f"{m['pred_time_ms']:>7.3f}{star}"
+        )
+    print("-" * 88)
+    print(f"-> Highest Performing Model: {res['best_model_name']} with F1-Score of {res['best_f1_score']}%\n")
+
+    # 4. Confusion Matrices
+    print("[CONFUSION MATRICES ON TEST SET]")
+    print(f"Classes: {res['class_labels']}  (Rows: Actual | Columns: Predicted)")
+    for m in res["model_benchmarks"]:
+        cm = m["confusion_matrix"]
+        print(f"\n  --- {m['model_name']} ({m['parameters']}) ---")
+        if len(cm) == 2:
+            print(f"      Predicted Fail  Predicted Pass")
+            print(f"  Actual Fail:   {cm[0][0]:<14}  {cm[0][1]} (False Positives)")
+            print(f"  Actual Pass:   {cm[1][0]:<14}  {cm[1][1]} (True Positives)")
+        else:
+            for row in cm:
+                print(f"    {row}")
+
+    # 5. Decision Tree Rules Snippet
+    print("\n[DECISION TREE INTERPRETABLE RULES (Explainability)]")
+    if res.get("tree_rules"):
+        lines = res["tree_rules"].split("\n")[:12]
+        for line in lines:
+            print("  " + line)
+        if len(res["tree_rules"].split("\n")) > 12:
+            print("  ... [truncated for readability]")
+
+    # 6. Sample Student Predictions
+    print("\n" + "=" * 78)
+    print("[OPERATION 6: PREDICTION DEMONSTRATION ON SAMPLE STUDENT PROFILES]")
+    print("=" * 78)
+
+    # Profile 1: Diligent Student
+    p1 = {
+        "studytime": 4,      # >10 hours/week
+        "failures": 0,       # 0 past failures
+        "absences": 2,       # 2 absences
+        "Medu": 4,           # Mother higher ed
+        "Fedu": 4,           # Father higher ed
+        "freetime": 3,
+        "goout": 2,
+        "health": 5,
+        "age": 16
+    }
+    pred1 = predict_single_record(p1)
+    print("\nTest Case 1: Diligent Student (Study Time: >10 hrs/wk, 0 Failures, 2 Absences)")
+    print("  Predictions across models:")
+    for pred in pred1["sample_predictions"]:
+        conf = f"(Confidence: {pred['confidence']}%)" if pred["confidence"] else ""
+        print(f"  -> {pred['model']:<15} : Predicted [{pred['predicted_class']}] {conf}")
+
+    # Profile 2: At-Risk Student
+    p2 = {
+        "studytime": 1,      # <2 hours/week
+        "failures": 3,       # 3 past failures
+        "absences": 28,      # 28 absences
+        "Medu": 1,
+        "Fedu": 1,
+        "freetime": 4,
+        "goout": 5,
+        "health": 3,
+        "age": 18
+    }
+    pred2 = predict_single_record(p2)
+    print("\nTest Case 2: At-Risk Student (Study Time: <2 hrs/wk, 3 Failures, 28 Absences)")
+    print("  Predictions across models:")
+    for pred in pred2["sample_predictions"]:
+        conf = f"(Confidence: {pred['confidence']}%)" if pred["confidence"] else ""
+        print(f"  -> {pred['model']:<15} : Predicted [{pred['predicted_class']}] {conf}")
+
+    # 7. Optional Interactive Input
+    print("\n" + "=" * 78)
+    print("INTERACTIVE STUDENT PREDICTOR (Press Enter to test your custom inputs)")
+    print("=" * 78)
+    try:
+        # Check if stdin is a real tty
+        if sys.stdin.isatty():
+            choice = input("Would you like to test a custom student record? (y/n) [default: n]: ").strip().lower()
+            if choice == "y":
+                print("Enter student details:")
+                studytime = float(input("  Study time category (1: <2h, 2: 2-5h, 3: 5-10h, 4: >10h) [default 2]: ") or 2)
+                failures = float(input("  Past class failures (0 to 3) [default 0]: ") or 0)
+                absences = float(input("  Total school absences (0 to 75) [default 6]: ") or 6)
+                medu = float(input("  Mother's education (0: None, 1: Primary, 2: 5-9th, 3: Sec, 4: Higher) [default 2]: ") or 2)
+                fedu = float(input("  Father's education (0: None, 1: Primary, 2: 5-9th, 3: Sec, 4: Higher) [default 2]: ") or 2)
+
+                custom_p = {
+                    "studytime": studytime,
+                    "failures": failures,
+                    "absences": absences,
+                    "Medu": medu,
+                    "Fedu": fedu,
+                    "freetime": 3,
+                    "goout": 3,
+                    "health": 4,
+                    "age": 17
+                }
+                custom_pred = predict_single_record(custom_p)
+                print("\n  Custom Student Model Predictions:")
+                for pred in custom_pred["sample_predictions"]:
+                    conf = f"(Confidence: {pred['confidence']}%)" if pred["confidence"] else ""
+                    print(f"  -> {pred['model']:<15} : Predicted [{pred['predicted_class']}] {conf}")
+        else:
+            print("  (Non-interactive execution detected -- skipping interactive prompt)")
+    except Exception as e:
+        print(f"  (Interactive input skipped: {e})")
+
+    print("\n" + "=" * 78)
+    print("AI PRACTICAL 12 BENCHMARK COMPLETED SUCCESSFULLY!")
+    print("=" * 78)
+
+
+if __name__ == "__main__":
+    print_banner()
+    run_benchmark()
