@@ -1,0 +1,227 @@
+"""
+Practical 11: AI-Based Crop Disease Advisory & Farming Rule Reasoning System
+=============================================================================
+Syllabus: Represent a real-world problem using propositional logic or
+          first-order logic and perform logical inference to derive conclusions
+          using an AI reasoning approach.
+
+Topic: Propositional Logic, First-Order Logic (FOL), Modus Ponens, Resolution Proof
+Real-Life Problem: Farmer notices unusual symptoms on cotton/crop leaves in Gujarat.
+                   The AI reasoning system uses formal logic rules to infer diagnoses
+                   and agricultural advisories without statistical hallucination.
+
+File Name: practical_11_logic.py
+How to Run:
+    python practicals/practical_11_logic/non_ui.py
+"""
+
+import sys
+import time
+from pathlib import Path
+
+# Ensure project root is on sys.path
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from practicals.practical_11_logic.logic import (
+    PROPOSITIONS_MAP,
+    FARMING_KNOWLEDGE_RULES,
+    forward_chaining_crop_advisory,
+    sympy_crop_resolution_proof,
+    run_logic_reasoning
+)
+
+
+def ascii_safe(text):
+    """Sanitizes unicode mathematical logic symbols for standard Windows cp1252 terminals."""
+    return (
+        str(text)
+        .replace("∀", "FORALL ")
+        .replace("∧", " AND ")
+        .replace("∨", " OR ")
+        .replace("→", "->")
+        .replace("⊥", "FALSE (Contradiction)")
+        .replace("≤", "<=")
+        .replace("≥", ">=")
+    )
+
+
+def print_banner(text):
+    print("\n" + "=" * 75)
+    print(f"  {text}")
+    print("=" * 75)
+
+
+def display_knowledge_base():
+    """Prints the Knowledge Base in Propositional and First-Order Logic forms."""
+    print("\n---------------------------------------------------------------------------")
+    print("  KNOWLEDGE BASE (KB) RULES [Horn Clauses & First-Order Logic Form]:")
+    print("---------------------------------------------------------------------------")
+    for r in FARMING_KNOWLEDGE_RULES:
+        if r["id"].startswith("RULE_LEGACY"):
+            continue
+        print(f"  [{r['id']}] {r['title']}")
+        print(f"     Propositional : {ascii_safe(r['prop_formula'])}")
+        print(f"     First-Order   : {ascii_safe(r['fol_formula'])}")
+        print(f"     Explanation   : {r['explanation']}")
+        print()
+
+
+def run_scenario(title, field_name, crop_type, asserted_facts, query):
+    """Executes a full logic reasoning scenario and prints detailed deduction trace."""
+    print_banner(title)
+    print(f"Field Name        : {field_name}")
+    print(f"Crop Type         : {crop_type}")
+    print("Asserted Facts    :")
+    for f in asserted_facts:
+        f_info = PROPOSITIONS_MAP.get(f, {})
+        print(f"  - [{f_info.get('symbol', f)}] {f_info.get('name', f)} ({f_info.get('fol_pred', '').replace('(x)', f'({field_name})')})")
+    print(f"Target Query      : [{PROPOSITIONS_MAP.get(query, {}).get('symbol', query)}] {PROPOSITIONS_MAP.get(query, {}).get('name', query)}")
+    print("---------------------------------------------------------------------------")
+
+    # 1. Forward Chaining (Modus Ponens)
+    print("\n[METHOD 1: FORWARD CHAINING INFERENCE (MODUS PONENS & FOL SUBSTITUTION)]")
+    fc = forward_chaining_crop_advisory(asserted_facts, query=query, field_name=field_name)
+
+    steps = fc["inference_steps"]
+    if not steps:
+        print("  -> No rules matched the asserted facts. No new conclusions derived.")
+    else:
+        for s in steps:
+            print(f"  Step {s['step']} | Triggered: {s['rule_id']} ({s['rule_title']})")
+            print(f"    Antecedents Met   : {', '.join(s['antecedents_satisfied'])}")
+            print(f"    FOL Instantiation : {ascii_safe(s['ground_instance'])}")
+            print(f"    Modus Ponens Rule : {ascii_safe(s['rule_prop'])}")
+            print(f"    => DERIVED FACT   : [{s['derived_key']}] {s['derived_fact']}")
+            print(f"    Explanation       : {s['explanation']}")
+            print()
+
+    print(f"  Forward Chaining Result: Target Query '{query}' is "
+          f"{'PROVEN TRUE (+)' if fc['is_proven'] else 'NOT PROVEN (-)'}")
+    print(f"  Total Facts Derived   : {fc['total_derived_facts']}")
+    print(f"  Execution Time        : {fc['execution_time_ms']} ms")
+
+    # 2. SymPy Resolution Refutation Proof
+    print("\n[METHOD 2: SYMPY RESOLUTION REFUTATION PROOF (CNF CONTRADICTION)]")
+    res = sympy_crop_resolution_proof(asserted_facts, query=query)
+    print(f"  Query Theorem       : {query} ({res['query_desc']})")
+    print(f"  Refutation Theorem  : KB AND NOT({query})")
+    print(f"  CNF Formula Length  : {len(res['cnf_formula'])} characters")
+    print(f"  Resolution Status   : {ascii_safe(res['refutation_status'])}")
+    print(f"  Formal Theorem Proof: {'PROVED BY RESOLUTION REFUTATION' if res['is_proven'] else 'CANNOT BE PROVED'}")
+    print(f"  Execution Time      : {res['execution_time_ms']} ms")
+
+    # 3. Agricultural Advisory Synthesis
+    full_run = run_logic_reasoning(asserted_facts, query=query, field_name=field_name, crop_type=crop_type)
+    print("\n[SYNTHESIZED AGRICULTURAL ADVISORY & RECOMMENDATION]")
+    print(f"  Health Risk Level   : {full_run['risk_level']}")
+    print(f"  Advisory Summary    : {full_run['advisory_summary']}")
+    print("---------------------------------------------------------------------------")
+
+
+def interactive_mode():
+    """Prompts farmer / student for interactive field symptoms."""
+    print_banner("INTERACTIVE FARMER CROP DISEASE REASONING PANEL")
+    print("Enter observations for your field. The logic engine will deduce conclusions.\n")
+
+    field_name = input("Enter Field Identifier (default 'Gujarat_Cotton_FieldA'): ").strip()
+    if not field_name:
+        field_name = "Gujarat_Cotton_FieldA"
+
+    print("\nSelect Crop Type:")
+    print("  1. Cotton (Kapas)")
+    print("  2. Groundnut (Moongfali)")
+    print("  3. Wheat (Gehun)")
+    crop_choice = input("Enter choice (1-3, default 1): ").strip()
+    crop_type = "Cotton" if crop_choice == "1" else ("Groundnut" if crop_choice == "2" else ("Wheat" if crop_choice == "3" else "Cotton"))
+
+    symptom_keys = [
+        ("LEAF_SPOTS", "Are unusual spots or necrotic lesions visible on leaves? (y/n)"),
+        ("HIGH_HUMIDITY", "Is ambient relative humidity high (>=80%)? (y/n)"),
+        ("LEAF_YELLOWING", "Is leaf yellowing / chlorosis visible? (y/n)"),
+        ("WATERLOGGED", "Is soil around roots waterlogged / standing water? (y/n)"),
+        ("INSECTS_VISIBLE", "Are sucking insects, aphids, or whiteflies visible? (y/n)"),
+        ("LEAF_CURLING", "Are leaves curling upward or wilting? (y/n)"),
+        ("POWDERY_RESIDUE", "Is white powdery mildew residue visible? (y/n)")
+    ]
+
+    asserted = []
+    print("\nAnswer for each observable symptom:")
+    for key, prompt in symptom_keys:
+        ans = input(f"  {prompt} [n]: ").strip().lower()
+        if ans in ("y", "yes", "true", "1"):
+            asserted.append(key)
+
+    print("\nSelect Query to Prove:")
+    print("  1. FUNGAL_RISK (Flag Fungal Blight Risk)")
+    print("  2. EXPERT_CONSULT (Escalate to University/KVK Expert)")
+    print("  3. VIRAL_VECTOR_RISK (Cotton Leaf Curl Virus Risk)")
+    print("  4. ROOT_ROT_RISK (Severe Root Rot Danger)")
+    print("  5. INSPECT_LEAVES (Inspect Leaves with Lens)")
+    q_choice = input("Enter choice (1-5, default 1): ").strip()
+    query_map = {
+        "1": "FUNGAL_RISK",
+        "2": "EXPERT_CONSULT",
+        "3": "VIRAL_VECTOR_RISK",
+        "4": "ROOT_ROT_RISK",
+        "5": "INSPECT_LEAVES"
+    }
+    query = query_map.get(q_choice, "FUNGAL_RISK")
+
+    run_scenario(
+        f"USER SCENARIO: Field '{field_name}' ({crop_type})",
+        field_name,
+        crop_type,
+        asserted,
+        query
+    )
+
+
+def main():
+    print_banner("AI PRACTICAL 11: CROP DISEASE ADVISORY & LOGIC REASONING SYSTEM")
+    print("Syllabus: Propositional Logic, First-Order Logic & Logical Inference")
+    print("Domain  : Gujarat Agriculture (Cotton, Groundnut, Wheat Disease Advisory)")
+
+    display_knowledge_base()
+
+    print("\n[Executing 3 Standard Syllabus Demonstration Scenarios]...\n")
+
+    # Scenario 1: Fungal Disease Risk (Leaf Spots + High Humidity)
+    run_scenario(
+        "SCENARIO 1: Leaf Spots + High Humidity in Cotton (Fungal Risk)",
+        field_name="Field_A",
+        crop_type="Cotton",
+        asserted_facts=["LEAF_SPOTS", "HIGH_HUMIDITY"],
+        query="FUNGAL_RISK"
+    )
+
+    # Scenario 2: Sucking Pest & Viral Vector Risk (Insects + Curling + Yellowing)
+    run_scenario(
+        "SCENARIO 2: Whiteflies + Curling + Yellowing in Cotton (Leaf Curl Virus)",
+        field_name="Field_B",
+        crop_type="Cotton",
+        asserted_facts=["INSECTS_VISIBLE", "LEAF_CURLING", "LEAF_YELLOWING"],
+        query="VIRAL_VECTOR_RISK"
+    )
+
+    # Scenario 3: Waterlogging & Root Rot Danger (Yellowing + Waterlogged Soil)
+    run_scenario(
+        "SCENARIO 3: Waterlogged Soil + Chlorosis in Groundnut (Root Rot)",
+        field_name="Field_C",
+        crop_type="Groundnut",
+        asserted_facts=["LEAF_YELLOWING", "WATERLOGGED"],
+        query="ROOT_ROT_RISK"
+    )
+
+    # Optional interactive mode check
+    if sys.stdin.isatty():
+        choice = input("\nWould you like to enter your own custom field observations? (y/n) [n]: ").strip().lower()
+        if choice in ("y", "yes"):
+            interactive_mode()
+
+    print_banner("PRACTICAL 11 EXECUTION COMPLETED SUCCESSFULLY!")
+
+
+if __name__ == "__main__":
+    main()
